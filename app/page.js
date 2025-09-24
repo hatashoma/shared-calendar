@@ -19,6 +19,7 @@ export default function Home() {
   const [events, setEvents] = useState([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(null); // 🔹 クリックした日付
 
   // 🔹 ログイン
   const handleLogin = async () => {
@@ -136,16 +137,41 @@ export default function Home() {
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             events={events}
-            dateClick={async (info) => {
-              const eventTitle = prompt("予定タイトルを入力してください");
-              if (!eventTitle) return;
-              await addEvent(eventTitle, info.dateStr);
+            dateClick={(info) => {
+              setSelectedDate(info.dateStr); // 🔹 日付を選択
             }}
             eventClick={(info) => {
               const event = events.find((e) => e.id === info.event.id);
               if (event) deleteEvent(event.id, event.owner);
             }}
           />
+
+          {/* 🔹 選択した日の予定一覧表示 */}
+          {selectedDate && (
+            <div className="mt-6 p-4 border rounded bg-gray-50">
+              <h2 className="text-lg font-bold mb-2">{selectedDate} の予定</h2>
+              <ul>
+                {events
+                  .filter((event) => event.date === selectedDate)
+                  .map((event) => (
+                    <li key={event.id} className="mb-1">
+                      {event.title}
+                      {event.owner === user.uid && (
+                        <button
+                          className="ml-2 text-red-500"
+                          onClick={() => deleteEvent(event.id, event.owner)}
+                        >
+                          削除
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                {events.filter((event) => event.date === selectedDate).length === 0 && (
+                  <li>予定はありません</li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </main>
