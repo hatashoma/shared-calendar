@@ -43,7 +43,8 @@ export default function Home() {
       await addDoc(collection(db, "events"), {
         title: eventTitle,
         date: eventDate,
-        owner: user.uid, // 自分のUIDを保存
+        owner: user.uid,            // UID
+        ownerName: user.displayName // 名前
       });
     } catch (e) {
       console.error("Error adding document: ", e);
@@ -72,7 +73,9 @@ export default function Home() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetched = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data(),
+        title: `${doc.data().title} (${doc.data().ownerName})`, // 名前付きタイトル
+        date: doc.data().date,
+        owner: doc.data().owner,
       }));
       setEvents(fetched);
     });
