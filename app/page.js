@@ -43,13 +43,8 @@ export default function Home() {
       await addDoc(collection(db, "events"), {
         title: eventTitle,
         date: eventDate,
-
-        owner: user.uid,            // UID
-        ownerName: user.displayName, // 名前
-
-        owner: user.uid, // 自分のUIDを保存
+        owner: user.uid,
         ownerName: user.displayName,
- f1a4965690fbd8930acc3cb527afc93c97fb77d3
       });
     } catch (e) {
       console.error("Error adding document: ", e);
@@ -78,11 +73,7 @@ export default function Home() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetched = snapshot.docs.map((doc) => ({
         id: doc.id,
-HEAD,
-        title: `${doc.data().title} (${doc.data().ownerName})`, // 名前付きタイトル
-
-        title: `${doc.data().title} (${doc.data().ownerName})`, // 名前を表示
-f1a4965690fbd8930acc3cb527afc93c97fb77d3,
+        title: `${doc.data().title} (${doc.data().ownerName})`,
         date: doc.data().date,
         owner: doc.data().owner,
       }));
