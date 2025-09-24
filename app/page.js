@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 import {
   collection,
   addDoc,
@@ -19,16 +24,31 @@ export default function Home() {
   const [events, setEvents] = useState([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [selectedDate, setSelectedDate] = useState(null); // 🔹 クリックした日付
+  const [selectedDate, setSelectedDate] = useState(null);
 
-  // 🔹 ログイン
-  const handleLogin = async () => {
+  // 🔹 Google ログイン
+  const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
       setUser(result.user);
     } catch (error) {
-      console.error(error);
+      console.error("Google login error:", error);
+    }
+  };
+
+  // 🔹 Apple ログイン
+  const handleAppleLogin = async () => {
+    const provider = new OAuthProvider("apple.com");
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // displayName がない場合に対応
+      setUser({
+        ...result.user,
+        displayName: result.user.displayName || "Appleユーザー",
+      });
+    } catch (error) {
+      console.error("Apple login error:", error);
     }
   };
 
@@ -88,12 +108,20 @@ export default function Home() {
       <h1 className="text-2xl font-bold mb-4">📅 共有カレンダー</h1>
 
       {!user ? (
-        <button
-          className="px-4 py-2 bg-blue-500 text-white rounded"
-          onClick={handleLogin}
-        >
-          Googleでログイン
-        </button>
+        <div className="space-x-2">
+          <button
+            className="px-4 py-2 bg-blue-500 text-white rounded"
+            onClick={handleGoogleLogin}
+          >
+            Googleでログイン
+          </button>
+          <button
+            className="px-4 py-2 bg-black text-white rounded"
+            onClick={handleAppleLogin}
+          >
+            Appleでログイン
+          </button>
+        </div>
       ) : (
         <div>
           <p className="mb-2">ログイン中: {user.displayName}</p>
@@ -137,9 +165,7 @@ export default function Home() {
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             events={events}
-            dateClick={(info) => {
-              setSelectedDate(info.dateStr); // 🔹 日付を選択
-            }}
+            dateClick={(info) => setSelectedDate(info.dateStr)}
             eventClick={(info) => {
               const event = events.find((e) => e.id === info.event.id);
               if (event) deleteEvent(event.id, event.owner);
