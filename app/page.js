@@ -2,20 +2,24 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+import { signOut, updateProfile } from "firebase/auth";
 import {
   collection,
   addDoc,
   deleteDoc,
   doc,
   onSnapshot,
+  query,
+  where,
+  getDocs,
+  updateDoc,
 } from "firebase/firestore";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { useRouter } from "next/navigation";
 
-// 管理者UIDをここに登録
+// 管理者UID
 const ADMIN_UIDS = ["pvJLH8T8kfhbMx5t6V9CBZBohsI2"];
 
 export default function Home() {
@@ -26,6 +30,10 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [newTemplate, setNewTemplate] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUserUid, setSelectedUserUid] = useState("");
+  const [selectedUserName, setSelectedUserName] = useState("");
   const router = useRouter();
 
   const isAdmin = user && ADMIN_UIDS.includes(user.uid);
@@ -35,6 +43,48 @@ export default function Home() {
     await signOut(auth);
     setUser(null);
     router.push("/login");
+  };
+
+  // 自分のユーザーネーム変更
+  const updateUserNameSelf = async (name) => {
+    if (!user) return;
+    try {
+      await updateProfile(user, { displayName: name });
+
+      // Firestoreの自分のイベント更新
+      const q = query(collection(db, "events"), where("owner", "==", user.uid));
+      const snapshot = await getDocs(q);
+      await Promise.all(
+        snapshot.docs.map((docSnap) =>
+          updateDoc(doc(db, "events", docSnap.id), { ownerName: name })
+        )
+      );
+
+      setUser({ ...user, displayName: name });
+      alert("ユーザーネームを変更し、既存イベントも更新しました！");
+    } catch (e) {
+      console.error("ユーザーネーム変更エラー:", e);
+    }
+  };
+
+  // 管理者が全ユーザーの名前変更
+  const updateUserNameAdmin = async (uid, name) => {
+    if (!isAdmin || !uid) return;
+    try {
+      // FirestoreのeventsのownerName更新
+      const q = query(collection(db, "events"), where("owner", "==", uid));
+      const snapshot = await getDocs(q);
+      await Promise.all(
+        snapshot.docs.map((docSnap) =>
+          updateDoc(doc(db, "events", docSnap.id), { ownerName: name })
+        )
+      );
+      // usersコレクションにも保存（authのdisplayName更新は管理者では不可のため）
+      await updateDoc(doc(db, "users", uid), { displayName: name });
+      alert("ユーザー名を変更しました（既存イベントも更新済み）");
+    } catch (e) {
+      console.error("管理者ユーザーネーム変更エラー:", e);
+    }
   };
 
   // イベント追加
@@ -52,7 +102,7 @@ export default function Home() {
     }
   };
 
-  // イベント削除（管理者は全てOK、一般は自分だけ）
+  // イベント削除（管理者は全てOK）
   const deleteEvent = async (id, owner) => {
     if (!isAdmin && user.uid !== owner) {
       alert("自分が追加した予定だけ削除できます。");
@@ -70,10 +120,7 @@ export default function Home() {
   // テンプレート追加（管理者のみ）
   const addTemplate = async (title) => {
     try {
-      await addDoc(collection(db, "templates"), {
-        title,
-        createdAt: new Date(), // 追加順でソートするためのフィールド
-      });
+      await addDoc(collection(db, "templates"), { title, createdAt: new Date() });
     } catch (e) {
       console.error("Error adding template: ", e);
     }
@@ -88,7 +135,7 @@ export default function Home() {
     }
   };
 
-  // 認証状態・イベント・テンプレート取得
+  // 認証状態・イベント・テンプレート・全ユーザー取得
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((u) => {
       if (u) setUser(u);
@@ -97,7 +144,7 @@ export default function Home() {
 
     if (!user) return;
 
-    // イベント取得
+    // events取得
     const qEvents = collection(db, "events");
     const unsubscribeSnapEvents = onSnapshot(qEvents, (snapshot) => {
       const fetched = snapshot.docs.map((doc) => ({
@@ -109,7 +156,7 @@ export default function Home() {
       setEvents(fetched);
     });
 
-    // テンプレート取得
+    // templates取得
     const qTemplates = collection(db, "templates");
     const unsubscribeSnapTemplates = onSnapshot(qTemplates, (snapshot) => {
       const fetched = snapshot.docs.map((doc) => ({
@@ -117,16 +164,30 @@ export default function Home() {
         title: doc.data().title,
         createdAt: doc.data().createdAt?.toDate?.() || new Date(0),
       }));
-      fetched.sort((a, b) => a.createdAt - b.createdAt); // 追加順に並べる
+      fetched.sort((a, b) => a.createdAt - b.createdAt);
       setTemplates(fetched);
     });
+
+    // 全ユーザー取得（管理者用）
+    let unsubscribeUsers = () => {};
+    if (isAdmin) {
+      const qUsers = collection(db, "users");
+      unsubscribeUsers = onSnapshot(qUsers, (snapshot) => {
+        const fetched = snapshot.docs.map((doc) => ({
+          uid: doc.id,
+          displayName: doc.data().displayName,
+        }));
+        setAllUsers(fetched);
+      });
+    }
 
     return () => {
       unsubscribeAuth();
       unsubscribeSnapEvents();
       unsubscribeSnapTemplates();
+      unsubscribeUsers();
     };
-  }, [user, router]);
+  }, [user, isAdmin, router]);
 
   if (!user) return null;
 
@@ -141,6 +202,65 @@ export default function Home() {
       >
         ログアウト
       </button>
+
+      {/* ユーザーネーム変更 */}
+      {!isAdmin && (
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="新しいユーザーネーム"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            className="border p-2 mr-2"
+          />
+          <button
+            onClick={() => {
+              if (!newUsername) return alert("名前を入力してください");
+              updateUserNameSelf(newUsername);
+              setNewUsername("");
+            }}
+            className="bg-yellow-500 text-white px-4 py-2 rounded"
+          >
+            名前変更
+          </button>
+        </div>
+      )}
+
+      {/* 管理者用：全ユーザー名前変更 */}
+      {isAdmin && (
+        <div className="mb-4">
+          <select
+            value={selectedUserUid}
+            onChange={(e) => {
+              setSelectedUserUid(e.target.value);
+              const u = allUsers.find((u) => u.uid === e.target.value);
+              setSelectedUserName(u?.displayName || "");
+            }}
+            className="border p-2 mr-2"
+          >
+            <option value="">ユーザー選択</option>
+            {allUsers.map((u) => (
+              <option key={u.uid} value={u.uid}>{u.displayName}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="新しいユーザーネーム"
+            value={selectedUserName}
+            onChange={(e) => setSelectedUserName(e.target.value)}
+            className="border p-2 mr-2"
+          />
+          <button
+            onClick={() => {
+              if (!selectedUserUid || !selectedUserName) return alert("ユーザーと名前を入力してください");
+              updateUserNameAdmin(selectedUserUid, selectedUserName);
+            }}
+            className="bg-yellow-500 text-white px-4 py-2 rounded"
+          >
+            名前変更
+          </button>
+        </div>
+      )}
 
       {/* イベント追加フォーム */}
       <div className="mb-6">
