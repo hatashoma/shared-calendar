@@ -211,7 +211,7 @@ export default function Home() {
             placeholder="新しいユーザーネーム"
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
-            className="border p-2 mr-2"
+            className="border p-1 mr-1"
           />
           <button
             onClick={() => {
@@ -219,7 +219,7 @@ export default function Home() {
               updateUserNameSelf(newUsername);
               setNewUsername("");
             }}
-            className="bg-yellow-500 text-white px-4 py-2 rounded"
+            className="bg-yellow-500 text-white px-2 py-1 rounded"
           >
             名前変更
           </button>
@@ -269,13 +269,13 @@ export default function Home() {
           placeholder="タイトル"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="border p-2 mr-2"
+          className="border p-1 mr-1"
         />
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="border p-2 mr-2"
+          className="border p-1 mr-1"
         />
         <button
           onClick={() => {
@@ -284,7 +284,7 @@ export default function Home() {
             setTitle("");
             setDate("");
           }}
-          className="bg-green-500 text-white px-4 py-2 rounded"
+          className="bg-green-500 text-white px-2 py-1 rounded"
         >
           追加
         </button>
