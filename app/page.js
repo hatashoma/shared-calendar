@@ -337,6 +337,7 @@ export default function Home() {
           const event = events.find((e) => e.id === info.event.id);
           if (event) deleteEvent(event.id, event.owner);
         }}
+        dayMaxEventRows={3}
       />
 
       {/* 選択日の予定一覧 */}
